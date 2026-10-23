@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BrainBlitz – Quiz</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>tailwind.config = {darkMode: 'class'}</script>
+  <style>
+    :root {
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    html {
+      scroll-padding-top: env(safe-area-inset-top, 0px)
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #e0e7ff, #fae8ff 50%, #cffafe)
+    }
+
+    html.dark body {
+      background: linear-gradient(135deg, #0f172a, #1e1b4b 55%, #042f2e)
+    }
+
+    .glass {
+      background: rgba(255, 255, 255, .75);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, .6)
+    }
+
+    html.dark .glass {
+      background: rgba(30, 41, 59, .7);
+      border-color: rgba(255, 255, 255, .08)
+    }
+
+    .seg {
+      transition: all .35s
+    }
+
+    .opt {
+      transition: all .2s
+    }
+
+    .opt:not(:disabled):hover {
+      transform: translateY(-2px)
+    }
+
+    @keyframes shake {
+      25% {
+        transform: translateX(-6px)
+      }
+
+      75% {
+        transform: translateX(6px)
+      }
+    }
+
+    .shake {
+      animation: shake .3s
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(10px)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+
+    .pop {
+      animation: pop .35s
+    }
+  </style>
+</head>
+
+<body class="text-slate-800 dark:text-slate-100">
+  <main class="max-w-3xl mx-auto p-4 sm:p-8">
+    <header class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-2"><span
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow">🧠</span>
+        <h1 class="text-2xl font-extrabold tracking-tight">BrainBlitz</h1>
+      </div>
+      <button id="theme" class="glass w-11 h-11 rounded-full shadow text-lg" aria-label="Toggle dark mode">🌙</button>
+    </header>
+
+    <section id="start" class="glass rounded-3xl shadow-xl p-8 sm:p-12 text-center pop">
+      <div class="text-6xl mb-4">🚀</div>
+      <h2 class="text-3xl font-extrabold mb-3">Web Dev Quiz Challenge</h2>
+      <p class="text-slate-600 dark:text-slate-300 mb-6">Answer 5 random questions before the clock runs out.</p>
+      <div class="flex flex-wrap justify-center gap-2 mb-8 text-sm">
+        <span class="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">5
+          questions</span>
+        <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200">20 s
+          each</span>
+        <span
+          class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200">PDF
+          report</span>
+      </div>
+      <button id="go"
+        class="px-8 py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 hover:scale-105 transition text-white text-lg font-bold shadow-lg">Start
+        Quiz</button>
+    </section>
+
+    <section id="quiz" class="hidden glass rounded-3xl shadow-xl p-5 sm:p-8">
+      <div class="flex gap-2 mb-2" id="bar" aria-label="Progress"></div>
+      <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-6">
+        <span id="count"></span><span id="cat" class="font-semibold uppercase tracking-wide"></span>
+      </div>
+      <div class="flex items-start gap-4 mb-6">
+        <h2 id="q" class="flex-1 text-xl sm:text-2xl font-bold leading-snug"></h2>
+        <div class="relative w-16 h-16 shrink-0">
+          <svg viewBox="0 0 36 36" class="w-16 h-16 -rotate-90">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor"
+              class="text-slate-200 dark:text-slate-700" stroke-width="3" />
+            <circle id="ring" cx="18" cy="18" r="15.9" fill="none" stroke="#6366f1" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0"
+              style="transition:stroke-dashoffset 1s linear,stroke .3s" />
+          </svg>
+          <span id="time" class="absolute inset-0 flex items-center justify-center font-extrabold text-lg"></span>
+        </div>
+      </div>
+      <div id="opts" class="grid gap-3 sm:grid-cols-2"></div>
+      <div class="flex items-center justify-between mt-6 gap-3">
+        <p id="msg" class="text-sm font-semibold"></p>
+        <button id="next"
+          class="hidden px-6 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 text-white font-bold shadow">Next
+          →</button>
+      </div>
+    </section>
+
+    <section id="result" class="hidden glass rounded-3xl shadow-xl p-6 sm:p-10 pop">
+      <div class="flex flex-col items-center">
+        <div class="relative w-36 h-36">
+          <svg viewBox="0 0 36 36" class="w-36 h-36 -rotate-90">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor"
+              class="text-slate-200 dark:text-slate-700" stroke-width="3" />
+            <circle id="sring" cx="18" cy="18" r="15.9" fill="none" stroke="#10b981" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="100"
+              style="transition:stroke-dashoffset 1s" />
+          </svg>
+          <span id="score" class="absolute inset-0 flex items-center justify-center text-3xl font-extrabold"></span>
+        </div>
+        <h2 id="verdict" class="text-2xl font-extrabold mt-4"></h2>
+        <div id="chips" class="flex flex-wrap justify-center gap-2 mt-3 text-sm"></div>
+      </div>
+      <div id="review" class="space-y-3 my-6"></div>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button id="pdf" class="flex-1 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">⬇
+          Download PDF</button>
+        <button id="again"
+          class="flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 text-white font-bold">↻
+          Retake Quiz</button>
+      </div>
+      <p id="pdfmsg" class="text-sm text-center mt-3 min-h-5"></p>
+    </section>
+  </main>
+
+  <script>
+    const BANK = [
+      {c: "HTML", q: "Which HTML element holds the page’s main visible content?", a: ["<head>", "<body>", "<meta>", "<title>"], k: 1},
+      {c: "CSS", q: "Which CSS property controls the stacking order of positioned elements?", a: ["order", "z-index", "stack", "layer"], k: 1},
+      {c: "JavaScript", q: "What does “===” do in JavaScript?", a: ["Assigns a value", "Compares value only", "Compares value and type", "Checks for NaN"], k: 2},
+      {c: "Tailwind", q: "Which Tailwind class makes an element a flex container?", a: ["flex", "d-flex", "flexbox", "display-flex"], k: 0},
+      {c: "JavaScript", q: "Which method converts a JSON string into an object?", a: ["JSON.stringify()", "JSON.parse()", "JSON.object()", "JSON.decode()"], k: 1},
+      {c: "CSS", q: "Which CSS unit is relative to the viewport width?", a: ["em", "rem", "vw", "px"], k: 2},
+      {c: "JavaScript", q: "Which array method returns a new array of items that pass a test?", a: ["map()", "reduce()", "filter()", "forEach()"], k: 2},
+      {c: "Bootstrap", q: "In Bootstrap’s grid, how many columns span a row?", a: ["6", "10", "12", "16"], k: 2},
+      {c: "HTML", q: "Which attribute makes an image accessible to screen readers?", a: ["title", "alt", "src", "name"], k: 1}
+    ];
+    const TIME = 20, L = ['A', 'B', 'C', 'D'], $ = id => document.getElementById(id);
+    const COL = {correct: 'bg-emerald-500', wrong: 'bg-rose-500', timeout: 'bg-amber-400'};
+    let Q = [], i = 0, res = [], t = TIME, timer = null, locked = false;
+    const shuffle = a => {a = [...a]; for (let k = a.length - 1; k > 0; k--) {const j = Math.random() * (k + 1) | 0;[a[k], a[j]] = [a[j], a[k]]} return a};
+    const root = document.documentElement;
+    function setTheme(d) {root.classList.toggle('dark', d); $('theme').textContent = d ? '☀️' : '🌙'; try {localStorage.setItem('bb-theme', d ? 'd' : 'l')} catch (e) { } }
+    let sv = null; try {sv = localStorage.getItem('bb-theme')} catch (e) { }
+    setTheme(sv ? sv === 'd' : matchMedia('(prefers-color-scheme: dark)').matches);
+    $('theme').onclick = () => setTheme(!root.classList.contains('dark'));
+    const show = id => ['start', 'quiz', 'result'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+
+    function start() {
+      Q = shuffle(BANK).slice(0, 5).map(x => ({c: x.c, q: x.q, o: shuffle(x.a.map((t, n) => ({t, ok: n === x.k})))}));
+      i = 0; res = Q.map(() => null); show('quiz'); render();
+    }
+    function drawBar() {
+      $('bar').innerHTML = Q.map((_, n) => {
+        const r = res[n]; let c = 'bg-slate-300 dark:bg-slate-600';
+        if (r) c = COL[r.status]; else if (n === i) c = 'bg-indigo-500 animate-pulse';
+        return `<div class="seg flex-1 h-3 rounded-full ${c}"></div>`
+      }).join('');
+    }
+    function render() {
+      locked = false; const q = Q[i];
+      $('count').textContent = `Question ${i + 1} / ${Q.length}`; $('cat').textContent = q.c;
+      $('q').textContent = q.q; $('msg').textContent = ''; $('next').classList.add('hidden'); $('opts').innerHTML = '';
+      q.o.forEach((o, n) => {
+        const b = document.createElement('button');
+        b.className = 'opt pop text-left p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-600 bg-white/70 dark:bg-slate-800/60 hover:border-indigo-400 flex gap-3 items-center font-medium';
+        b.innerHTML = `<span class="w-8 h-8 shrink-0 rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200 flex items-center justify-center text-sm font-bold">${L[n]}</span><span class="break-words min-w-0"></span>`;
+        b.lastChild.textContent = o.t; b.onclick = () => pick(n); $('opts').appendChild(b);
+      });
+      drawBar(); t = TIME; tick(); clearInterval(timer);
+      timer = setInterval(() => {t--; tick(); if (t <= 0) {clearInterval(timer); pick(-1)} }, 1000);
+    }
+    function tick() {
+      $('time').textContent = t; $('ring').style.strokeDashoffset = 100 - (t / TIME * 100);
+      $('ring').style.stroke = t <= 5 ? '#f43f5e' : t <= 10 ? '#f59e0b' : '#6366f1';
+    }
+    function pick(k) {
+      if (locked) return; locked = true; clearInterval(timer);
+      const q = Q[i], btns = [...$('opts').children], ci = q.o.findIndex(o => o.ok);
+      const status = k < 0 ? 'timeout' : q.o[k].ok ? 'correct' : 'wrong';
+      res[i] = {status, chosen: k < 0 ? null : q.o[k].t, correct: q.o[ci].t};
+      btns.forEach((b, n) => {
+        b.disabled = true;
+        if (n === ci) b.classList.add('!border-emerald-500', '!bg-emerald-100', 'dark:!bg-emerald-900/50');
+        else if (n === k) b.classList.add('!border-rose-500', '!bg-rose-100', 'dark:!bg-rose-900/50', 'shake');
+        else b.classList.add('opacity-50');
+      });
+      btns[ci].firstChild.textContent = '✓';
+      if (k >= 0 && k !== ci) btns[k].firstChild.textContent = '✗';
+      $('msg').className = 'text-sm font-semibold ' + (status === 'correct' ? 'text-emerald-600 dark:text-emerald-400' : status === 'wrong' ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400');
+      $('msg').textContent = status === 'correct' ? '🎉 Correct!' : status === 'wrong' ? '❌ Incorrect — see the right answer.' : '⌛ Time’s up!';
+      drawBar(); $('next').textContent = i === Q.length - 1 ? 'See Results' : 'Next →'; $('next').classList.remove('hidden');
+    }
+    $('next').onclick = () => {if (i < Q.length - 1) {i++; render()} else finish()};
+    document.addEventListener('keydown', e => {
+      if ($('quiz').classList.contains('hidden')) return;
+      if (!locked && '1234'.includes(e.key) && Q[i].o[+e.key - 1]) pick(+e.key - 1);
+      else if (locked && e.key === 'Enter') $('next').click();
+    });
+    const icon = {correct: '✅', wrong: '❌', timeout: '⌛'};
+    function finish() {
+      show('result');
+      const cnt = s => res.filter(r => r.status === s).length, n = cnt('correct'), p = Math.round(n / Q.length * 100);
+      $('score').textContent = `${n}/${Q.length}`;
+      setTimeout(() => $('sring').style.strokeDashoffset = 100 - p, 50);
+      $('verdict').textContent = p >= 80 ? '🏆 Excellent work!' : p >= 60 ? '👍 Good job!' : '💪 Keep practicing!';
+      $('chips').innerHTML = `<span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">${n} correct</span><span class="px-3 py-1 rounded-full bg-rose-100 text-rose-700">${cnt('wrong')} wrong</span><span class="px-3 py-1 rounded-full bg-amber-100 text-amber-700">${cnt('timeout')} timed out</span>`;
+      $('review').innerHTML = '';
+      Q.forEach((q, n) => {
+        const r = res[n], d = document.createElement('div');
+        d.className = 'p-4 rounded-2xl border-l-4 bg-white/60 dark:bg-slate-800/60 text-sm ' + ({correct: 'border-emerald-500', wrong: 'border-rose-500', timeout: 'border-amber-400'})[r.status];
+        d.innerHTML = '<p class="font-bold mb-1"></p><p class="text-slate-500 dark:text-slate-400"></p>';
+        d.children[0].textContent = `${icon[r.status]} ${n + 1}. ${q.q}`;
+        d.children[1].textContent = `Your answer: ${r.chosen ?? 'No answer (timed out)'} · Correct: ${r.correct}`;
+        $('review').appendChild(d);
+      });
+    }
+    $('go').onclick = start; $('again').onclick = start;
+
+    $('pdf').onclick = async () => {
+      const m = $('pdfmsg'); m.textContent = '';
+      try {
+        const {jsPDF} = window.jspdf, doc = new jsPDF(); let y = 20;
+        const n = res.filter(r => r.status === 'correct').length;
+        doc.setFontSize(20); doc.text('BrainBlitz – Quiz Results', 15, y); y += 9;
+        doc.setFontSize(11); doc.text(`Date: ${new Date().toLocaleString()}`, 15, y); y += 7;
+        doc.setFontSize(14); doc.text(`Score: ${n} / ${Q.length} (${Math.round(n / Q.length * 100)}%)`, 15, y); y += 10;
+        const lbl = {correct: 'Correct', wrong: 'Wrong', timeout: 'Timed out'};
+        Q.forEach((q, k) => {
+          const r = res[k]; doc.setFontSize(11);
+          const lines = [...doc.splitTextToSize(`${k + 1}. ${q.q}`, 180), ...doc.splitTextToSize(`Your answer: ${r.chosen ?? '-'}`, 180), ...doc.splitTextToSize(`Correct answer: ${r.correct}   [${lbl[r.status]}]`, 180)];
+          if (y + lines.length * 6 > 280) {doc.addPage(); y = 20}
+          doc.setTextColor(r.status === 'correct' ? 0 : 180, r.status === 'correct' ? 130 : 0, 0);
+          doc.text(lines, 15, y); y += lines.length * 6 + 4;
+        });
+        doc.save('quiz-results.pdf');
+        m.textContent = 'PDF ready ✔';
+      } catch (e) {m.textContent = 'Couldn’t create the PDF.'}
+    };
+  </script>
+</body>
+
+</html>
